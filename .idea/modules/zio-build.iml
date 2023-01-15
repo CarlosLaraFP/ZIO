@@ -17,7 +17,7 @@
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/lib/scala-compiler.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/lib/scala-library.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/lib/scala-reflect.jar!/" />
-          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/lib/scala-xml_2.12.jar!/" />
+          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/lib/scala-xml_2.12-1.0.6.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/actions_2.12-1.6.2.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/caffeine-2.8.5.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/checker-qual-3.4.1.jar!/" />
@@ -46,7 +46,7 @@
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/jline-terminal-jna-3.19.0.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/jna-5.8.0.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/jna-platform-5.8.0.jar!/" />
-          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/jsch.jar!/" />
+          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/jsch-0.1.54.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/launcher-interface-1.3.3.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/librarymanagement-core_2.12-1.6.1.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/librarymanagement-ivy_2.12-1.6.1.jar!/" />
@@ -58,7 +58,7 @@
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/main-settings_2.12-1.6.2.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/main_2.12-1.6.2.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/okhttp-3.14.2.jar!/" />
-          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/okhttp-urlconnection.jar!/" />
+          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/okhttp-urlconnection-3.7.0.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/okio-1.17.2.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/protocol_2.12-1.6.2.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/reactive-streams-1.0.2.jar!/" />
@@ -73,7 +73,7 @@
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/scala-xml_2.12-1.3.0.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/scripted-plugin_2.12-1.6.2.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/shaded-jawn-parser_2.12-0.9.1.jar!/" />
-          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/shaded-scalajson_2.12.jar!/" />
+          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/shaded-scalajson_2.12-1.0.0-M4.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/sjson-new-core_2.12-0.9.1.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/sjson-new-murmurhash_2.12-0.9.1.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/sjson-new-scalajson_2.12-0.9.1.jar!/" />
@@ -81,9 +81,9 @@
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/ssl-config-core_2.12-0.4.0.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/task-system_2.12-1.6.2.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/tasks_2.12-1.6.2.jar!/" />
-          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/template-resolver.jar!/" />
+          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/template-resolver-0.1.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/test-agent-1.6.2.jar!/" />
-          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/test-interface-0.0.jar!/" />
+          <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/test-interface-1.0.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/testing_2.12-1.6.2.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/util-cache_2.12-1.6.2.jar!/" />
           <root url="jar://$USER_HOME$/.sbt/boot/scala-2.12.15/org.scala-sbt/sbt/1.6.2/util-control_2.12-1.6.2.jar!/" />
@@ -112,6 +112,6 @@
   <component name="SbtModule">
     <option name="buildForURI" value="file:$MODULE_DIR$/../../" />
     <option name="imports" value="_root_.sbt.Keys._, _root_.sbt.ScriptedPlugin.autoImport._, _root_.sbt.plugins.JUnitXmlReportPlugin.autoImport._, _root_.sbt.plugins.MiniDependencyTreePlugin.autoImport._, _root_.sbt._, _root_.sbt.nio.Keys._, _root_.sbt.plugins.IvyPlugin, _root_.sbt.plugins.JvmPlugin, _root_.sbt.plugins.CorePlugin, _root_.sbt.ScriptedPlugin, _root_.sbt.plugins.SbtPlugin, _root_.sbt.plugins.SemanticdbPlugin, _root_.sbt.plugins.JUnitXmlReportPlugin, _root_.sbt.plugins.Giter8TemplatePlugin, _root_.sbt.plugins.MiniDependencyTreePlugin, _root_.scala.xml.{TopScope=&gt;SUB:DOLLARscope}" />
-    <option name="resolvers" value="https://repo1.maven.org/maven2/|maven|public, /Users/daniel/.ivy2/cache|ivy|true|Local cache" />
+    <option name="resolvers" value="$USER_HOME$/.ivy2/cache|ivy|true|Local cache, https://repo1.maven.org/maven2/|maven|public" />
   </component>
 </module>
