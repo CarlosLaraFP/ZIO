@@ -46,6 +46,39 @@ object Variance {
     }
   }
 
+  /*
+    Rule of thumb:
+      - if the type PRODUCES or RETRIEVES values of type A (i.e. List), then the type should be COVARIANT
+      - if the type CONSUMES or ACTS ON values of type A (i.e. serializers, processors, utils), then the type should be CONTRAVARIANT
+      - otherwise, INVARIANT
+  */
+
+  // Variance positions
+
+  //class Vet2[-A](val favoriteAnimal: A)
+  // the types of val fields are in COVARIANT position
+
+  //class MutableContainer[+A](var contents: A)
+  // the types of var fields are in CONTRAVARIANT position
+
+  // In fact, var fields are only applicable for invariant types.
+
+  // types of method parameters are in CONTRAVARIANT position
+  //class MyList2[+A] { def add(element: A): MyList[A] }
+
+  // solution: WIDEN the type parameter
+  class MyList2[+A] {
+    def add[B >: A](element: B): MyList[B] = ???
+  }
+
+  // method return types are in COVARIANT position
+  //abstract class Vet2[-A] { def rescueAnimal(): A }
+
+  // solution: NARROW the type parameter
+  abstract class Vet2[-A] {
+    def rescueAnimal[B <: A](): B
+  }
+
 
   def main(args: Array[String]): Unit = {
     //
