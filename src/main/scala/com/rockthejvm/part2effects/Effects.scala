@@ -73,23 +73,20 @@ object Effects {
     java.util.Calendar.getInstance().getTimeInMillis
   })
 
-  def measure[A](computation: MyIO[A]): MyIO[(Long, A)] = {
-    val start = getCurrentTime.unsafeRun()
+  def measure[A](computation: MyIO[A]): MyIO[(Long, A)] =
     for {
+      start <- getCurrentTime
       _ <- computation
       secondResult <- computation
-    } yield (getCurrentTime.unsafeRun() - start, secondResult)
-  }
+      end <- getCurrentTime
+    } yield (end - start, secondResult)
 
-  /*
-    MyIO(() => {
-      val start = getCurrentTime.unsafeRun()
-      val result = computation.unsafeRun()
-      val end = getCurrentTime.unsafeRun()
-      //val result = computation.flatMap(i => computation.map(j => (i, j)))
-      (end - start, result)
-    })
-  */
+  def readFromConsole: MyIO[String] = MyIO(() => { scala.io.StdIn.readLine })
+
+  def userInteraction: MyIO[String] =
+    for {
+      userInput <- readFromConsole
+    } yield s"Welcome to ZIO, $userInput!"
 
 
   def main(args: Array[String]): Unit = {
@@ -105,5 +102,10 @@ object Effects {
 
     println(s"Total duration: ${measurement._1} milliseconds")
     println(s"Value returned from 2nd computation: ${measurement._2}")
+
+    println(readFromConsole.unsafeRun())
+
+    println("What is your name?")
+    println(userInteraction.unsafeRun())
   }
 }
