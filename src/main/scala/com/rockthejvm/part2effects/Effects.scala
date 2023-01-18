@@ -61,9 +61,25 @@ object Effects {
     42
   })
 
+  /*
+    Exercises
+    TODO 1: Create an IO to measure the current time of the system
+    TODO 2: Create an IO to measure the duration of a computation (use 1 and map/flatMap combinations of MyIO)
+    TODO 3: Create an IO to read something from the console
+    TODO 4: Print something to the console, then read, then print a welcome message
+  */
+  def getCurrentTime: MyIO[Long] = MyIO(() => {
+    println(java.util.Calendar.getInstance().getTimeZone.getDisplayName)
+    java.util.Calendar.getInstance().getTimeInMillis
+  })
+
+  def measure[A](computation: MyIO[A]): MyIO[(Long, A)] = ???
+
 
   def main(args: Array[String]): Unit = {
     //
     anIOWithSideEffects.unsafeRun()
+    val currentTime = getCurrentTime.unsafeRun()
+    println(currentTime)
   }
 }
