@@ -73,26 +73,37 @@ object Effects {
     java.util.Calendar.getInstance().getTimeInMillis
   })
 
-  def measure[A](computation: MyIO[A]): MyIO[(Long, A)] = MyIO(() => {
+  def measure[A](computation: MyIO[A]): MyIO[(Long, A)] = {
     val start = getCurrentTime.unsafeRun()
-    val result = computation.unsafeRun()
-    val end = getCurrentTime.unsafeRun()
-    (scala.math.abs(end - start), result)
-  })
+    for {
+      _ <- computation
+      secondResult <- computation
+    } yield (getCurrentTime.unsafeRun() - start, secondResult)
+  }
+
+  /*
+    MyIO(() => {
+      val start = getCurrentTime.unsafeRun()
+      val result = computation.unsafeRun()
+      val end = getCurrentTime.unsafeRun()
+      //val result = computation.flatMap(i => computation.map(j => (i, j)))
+      (end - start, result)
+    })
+  */
 
 
   def main(args: Array[String]): Unit = {
     //
     anIOWithSideEffects.unsafeRun()
 
-    val currentTime = getCurrentTime.unsafeRun()
-    println(currentTime)
+    println(getCurrentTime.unsafeRun())
 
     val measurement = measure(MyIO(() => {
       Thread.sleep(1000)
       "Slept for 1 second"
     })).unsafeRun()
-    println(measurement._1)
-    println(measurement._2)
+
+    println(s"Total duration: ${measurement._1} milliseconds")
+    println(s"Value returned from 2nd computation: ${measurement._2}")
   }
 }
