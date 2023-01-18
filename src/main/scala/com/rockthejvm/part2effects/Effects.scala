@@ -80,15 +80,33 @@ object Effects {
       end <- getCurrentTime
     } yield (end - start, result)
 
-  def readFromConsole(prompt: String): MyIO[String] = MyIO(() => {
-    println(prompt)
-    scala.io.StdIn.readLine
-  })
+  def readFromConsole: MyIO[String] = MyIO(() => scala.io.StdIn.readLine )
 
-  def userInteraction: MyIO[String] =
+  def display(text: String): MyIO[Unit] = MyIO(() => println(text))
+
+  def userInteraction: MyIO[Unit] =
     for {
-      userInput <- readFromConsole("What is your name?")
-    } yield s"Welcome to ZIO, $userInput!"
+      _ <- display("What is your name?")
+      userInput <- readFromConsole
+      _ <- display(s"Welcome to ZIO, $userInput!")
+    } yield ()
+
+  def identicalMeasure[A](computation: MyIO[A]): MyIO[(Long, A)] =
+    getCurrentTime flatMap { start =>
+      computation flatMap { result =>
+        getCurrentTime map { end =>
+          (end - start, result)
+        }
+      }
+    }
+
+  def referentiallyTransparentMeasure[A](computation: MyIO[A]): MyIO[(Long, A)] =
+    MyIO { () =>
+      val start = getCurrentTime.unsafeRun()
+      val result = computation.unsafeRun()
+      val end = getCurrentTime.unsafeRun()
+      (end - start, result)
+    }
 
 
   def main(args: Array[String]): Unit = {
@@ -104,8 +122,8 @@ object Effects {
     println(s"Total duration: ${measurement._1} milliseconds")
     println(s"Value returned from 2nd computation: ${measurement._2}")
     // 3
-    println(readFromConsole("Enter any input:").unsafeRun())
+    println(readFromConsole.unsafeRun())
     // 4
-    println(userInteraction.unsafeRun())
+    userInteraction.unsafeRun()
   }
 }
