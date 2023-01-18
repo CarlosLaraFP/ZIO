@@ -76,36 +76,36 @@ object Effects {
   def measure[A](computation: MyIO[A]): MyIO[(Long, A)] =
     for {
       start <- getCurrentTime
-      _ <- computation
-      secondResult <- computation
+      result <- computation
       end <- getCurrentTime
-    } yield (end - start, secondResult)
+    } yield (end - start, result)
 
-  def readFromConsole: MyIO[String] = MyIO(() => { scala.io.StdIn.readLine })
+  def readFromConsole(prompt: String): MyIO[String] = MyIO(() => {
+    println(prompt)
+    scala.io.StdIn.readLine
+  })
 
   def userInteraction: MyIO[String] =
     for {
-      userInput <- readFromConsole
+      userInput <- readFromConsole("What is your name?")
     } yield s"Welcome to ZIO, $userInput!"
 
 
   def main(args: Array[String]): Unit = {
     //
     anIOWithSideEffects.unsafeRun()
-
+    // 1
     println(getCurrentTime.unsafeRun())
-
+    // 2
     val measurement = measure(MyIO(() => {
       Thread.sleep(1000)
       "Slept for 1 second"
     })).unsafeRun()
-
     println(s"Total duration: ${measurement._1} milliseconds")
     println(s"Value returned from 2nd computation: ${measurement._2}")
-
-    println(readFromConsole.unsafeRun())
-
-    println("What is your name?")
+    // 3
+    println(readFromConsole("Enter any input:").unsafeRun())
+    // 4
     println(userInteraction.unsafeRun())
   }
 }
