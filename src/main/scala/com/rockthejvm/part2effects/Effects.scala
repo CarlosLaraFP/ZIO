@@ -2,6 +2,7 @@ package com.rockthejvm.part2effects
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.Try
 
 
 object Effects {
@@ -107,6 +108,26 @@ object Effects {
       val end = getCurrentTime.unsafeRun()
       (end - start, result)
     }
+
+  /*
+    A simplified ZIO
+
+    Try is a wrapper over a computation that might fail with an exception (only java.lang.Throwable)
+    Either is more powerful because the first type parameter represents ANY error type, even domain-specific.
+  */
+  case class MyZIO[R, E, A](unsafeRun: R => Either[E, A]) {
+    def map[B](f: A => B): MyZIO[R, E, B] =
+      MyZIO(r => unsafeRun(r) match {
+        case Left(e) => Left(e)
+        case Right(v) => Right(f(v))
+      })
+
+    def flatMap[B](f: A => MyZIO[R, E, B]): MyZIO[R, E, B] =
+      MyZIO(r => unsafeRun(r) match {
+        case Left(e) => Left(e)
+        case Right(v) => f(v).unsafeRun(r)
+      })
+  }
 
 
   def main(args: Array[String]): Unit = {
