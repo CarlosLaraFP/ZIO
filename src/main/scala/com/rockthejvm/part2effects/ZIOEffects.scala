@@ -71,8 +71,62 @@ object ZIOEffects {
   val aSuccessfulIO: IO[String, Int] = ZIO.succeed(34)
   val aFailedIO: IO[String, Int] = ZIO.fail("Something bad happened")
 
+  /*
+    Exercises
+  */
+  // TODO 1: sequence two ZIOs and take the value of the last one
+  // This effect first evaluates zioA, and then evaluates, zioB, if zioB is successful, we return its value
+  def sequenceTakeLast[R, E, A, B](zioA: ZIO[R, E, A], zioB: ZIO[R, E, B]): ZIO[R, E, B] =
+    for {
+      _ <- zioA
+      resultB <- zioB
+    } yield resultB
+
+  // TODO 2: sequence two ZIOs and take the value of the first one
+  // This effect first evaluates zioA, and then evaluates, zioB, if zioB is successful, we return its value
+  def sequenceTakeFirst[R, E, A, B](zioA: ZIO[R, E, A], zioB: ZIO[R, E, B]): ZIO[R, E, A] =
+    for {
+      resultA <- zioA
+      _ <- zioB
+    } yield resultA
+
+  // TODO 3: run a ZIO forever
+  def runForever[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, A] =
+    for {
+      result <- runForever(zio)
+    } yield result
+/*
+  val endlessLoop: UIO[Unit] = runForever {
+    ZIO.succeed {
+      println("running...")
+      Thread.sleep(1000)
+    }
+  }
+*/
+
+  // TODO 4: convert the value of a ZIO to something else
+  def convert[R, E, A, B](zio: ZIO[R, E, A], value: B): ZIO[R, E, B] =
+    for {
+      value <- zio
+    } yield value.asInstanceOf[B]
+
+  // TODO 5: discard the value of a ZIO to Unit
+  def asUnit[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, Unit] =
+    for {
+      _ <- zio
+    } yield ()
+
 
   def main(args: Array[String]): Unit = {
-    //
+    // ZIOs has guardrails to evaluate them (vs exposing unsafeRun directly)
+
+    val runtime = Runtime.default // thread pool mechanism
+
+    implicit val trace: Trace = Trace.empty // ability to debug ZIO applications on any thread
+
+    Unsafe.unsafeCompat { implicit u: Unsafe =>
+      val molEval = runtime.unsafe.run(meaningOfLife)
+      println(molEval)
+    }
   }
 }
