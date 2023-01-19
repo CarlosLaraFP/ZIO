@@ -114,15 +114,18 @@ object Effects {
 
     Try is a wrapper over a computation that might fail with an exception (only java.lang.Throwable)
     Either is more powerful because the first type parameter represents ANY error type, even domain-specific.
+
+    Because MyZIO produces either a value of type A or type E, both A and E should be covariant.
+    Because MyZIO consumes a value of type R (function argument), R should be contravariant.
   */
-  case class MyZIO[R, E, A](unsafeRun: R => Either[E, A]) {
+  case class MyZIO[-R, +E, +A](unsafeRun: R => Either[E, A]) {
     def map[B](f: A => B): MyZIO[R, E, B] =
       MyZIO(r => unsafeRun(r) match {
         case Left(e) => Left(e)
         case Right(v) => Right(f(v))
       })
 
-    def flatMap[B](f: A => MyZIO[R, E, B]): MyZIO[R, E, B] =
+    def flatMap[R1 <: R, E1 >: E, B](f: A => MyZIO[R1, E1, B]): MyZIO[R1, E1, B] =
       MyZIO(r => unsafeRun(r) match {
         case Left(e) => Left(e)
         case Right(v) => f(v).unsafeRun(r)
