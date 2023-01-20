@@ -125,10 +125,17 @@ object ZIOEffects {
       i <- ZIO.succeed(n)
       j <- sumZIO(i - 1)
     } yield i + j
-  // tail recursion only applies to flatMap chains (not map by itself, i.e. single line for-comprehension)
+  // ZIO tail recursion only applies to flatMap chains (not map by itself, i.e. single line for-comprehension)
 
   // TODO 7: Fibonacci sequence of ZIOs (hint: use ZIO.suspendSucceed to fix eventual StackOverflow errors and Throwable => Nothing)
-  def fibonacciZIO(n: Int): UIO[BigInt] = ???
+  // a series of numbers in which each number ( Fibonacci number ) is the sum of the two preceding numbers
+  def fibonacci(n: Int): BigInt = if (n <= 2) 1 else fibonacci(n - 1) + fibonacci(n - 2)
+  def fibonacciZIO(n: Int): UIO[BigInt] =
+    if (n <= 2) ZIO.succeed(1)
+    else for {
+      last <- ZIO.suspendSucceed(fibonacciZIO(n - 1)) // lazy effect that delays evaluation (like Cats Eval)
+      previous <- fibonacciZIO(n - 2)
+    } yield last + previous
 
 
   def main(args: Array[String]): Unit = {
@@ -155,6 +162,7 @@ object ZIOEffects {
       println(fifthEffect) // 99 => Success(())
       // Interesting. If a ZIO fails, it returns the error channel wrapped.
       // The actual yield value is only returned (wrapped) in case of success(es)
+
       // 3
 //      runtime.unsafe.run(runForeverZIO {
 //        ZIO.succeed {
@@ -162,8 +170,11 @@ object ZIOEffects {
 //          Thread.sleep(1000)
 //        }
 //      })
-      val sixthEffect = runtime.unsafe.run(sumZIO(100000)) // 5050
+      val sixthEffect = runtime.unsafe.run(sumZIO(100000))
       println(sixthEffect)
+      //println(sum(100000))
+      val seventhEffect = runtime.unsafe.run(fibonacciZIO(144))
+      println(seventhEffect)
     }
   }
 }
