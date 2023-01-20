@@ -85,6 +85,8 @@ object ZIOEffects {
       resultB <- zioB
     } yield resultB
 
+  def sequenceTakeLastZIO[R, E, A, B](zioA: ZIO[R, E, A], zioB: ZIO[R, E, B]): ZIO[R, E, B] = zioA *> zioB
+
   // TODO 2: sequence two ZIOs and take the value of the first one
   // This effect first evaluates zioA, and then evaluates, zioB, if zioB is successful, we return its value
   def sequenceTakeFirst[R, E, A, B](zioA: ZIO[R, E, A], zioB: ZIO[R, E, B]): ZIO[R, E, A] =
@@ -93,32 +95,28 @@ object ZIOEffects {
       _ <- zioB
     } yield resultA
 
-  // TODO 3: run a ZIO forever
-  //@tailrec
-  def runForever[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, A] =
-    for {
-      result <- runForever(zio)
-    } yield result
+  def sequenceTakeFirstZIO[R, E, A, B](zioA: ZIO[R, E, A], zioB: ZIO[R, E, B]): ZIO[R, E, A] = zioA <* zioB
 
-/*
-  val endlessLoop: UIO[Unit] = runForever {
-    ZIO.succeed {
-      println("running...")
-      Thread.sleep(1000)
-    }
-  }
-*/
+  // TODO 3: run a ZIO forever
+  def runForever[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, A] = zio.flatMap(_ => runForever(zio))
+  // TODO: ZIO flatMaps implement a technique called trampolining for allocating ZIO instances on the heap instead of on the stack => ZIO runtime evaluates this tail recursively (ZIO flatMap returns immediately with a new data structure)
+  def runForeverZIO[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, A] = zio *> runForeverZIO(zio)
+
   // TODO 4: convert the value of a ZIO to something else
-  def convert[R, E, A, B](zio: ZIO[R, E, A], value: B): ZIO[R, E, B] =
+  def convert[R, E, A, B](zio: ZIO[R, E, A], value: B): ZIO[R, E, B] = // zio.map(_ => value)
     for {
       _ <- zio
     } yield value
 
+  def convertZIO[R, E, A, B](zio: ZIO[R, E, A], value: B): ZIO[R, E, B] = zio.as(value)
+
   // TODO 5: discard the value of a ZIO to Unit
-  def asUnit[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, Unit] =
+  def asUnit[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, Unit] = // convertZIO(zio, ())
     for {
       _ <- zio
     } yield ()
+
+  def asUnitZIO[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, Unit] = zio.unit
 
 
   def main(args: Array[String]): Unit = {
@@ -132,22 +130,26 @@ object ZIOEffects {
       val molEval = runtime.unsafe.run(meaningOfLife)
       println(molEval)
       // 1
-      val firstZIO = runtime.unsafe.run(sequenceTakeLast(aSuccessfulIO, aSuccessfulTask))
-      println(firstZIO) // Success(89)
+      val firstEffect = runtime.unsafe.run(sequenceTakeLastZIO(aSuccessfulIO, aSuccessfulTask))
+      println(firstEffect) // Success(89)
       // 2
-      val secondZIO = runtime.unsafe.run(sequenceTakeFirst(aSuccessfulIO, aSuccessfulTask))
-      println(secondZIO) // Success(34)
-      // 3
-
+      val secondEffect = runtime.unsafe.run(sequenceTakeFirstZIO(aSuccessfulIO, aSuccessfulTask))
+      println(secondEffect) // Success(34)
       // 4
-      val fourthZIO = runtime.unsafe.run(convert(aUIO, "99 converted"))
-      println(fourthZIO)// 99 => Success("99 converted")
+      val fourthEffect = runtime.unsafe.run(convertZIO(aUIO, "99 converted"))
+      println(fourthEffect)// 99 => Success("99 converted")
       // 5
-      val fifthZIO = runtime.unsafe.run(asUnit(aUIO))
-      println(fifthZIO) // 99 => Success(())
-
+      val fifthEffect = runtime.unsafe.run(asUnitZIO(aUIO))
+      println(fifthEffect) // 99 => Success(())
       // Interesting. If a ZIO fails, it returns the error channel wrapped.
       // The actual yield value is only returned (wrapped) in case of success(es)
+      // 3
+      runtime.unsafe.run(runForeverZIO {
+        ZIO.succeed {
+          println("Running...")
+          Thread.sleep(1000)
+        }
+      })
     }
   }
 }
