@@ -1,6 +1,8 @@
 package com.rockthejvm.part2effects
 
-import zio._
+import zio.*
+
+import scala.annotation.tailrec
 
 object ZIOEffects {
   /*
@@ -28,6 +30,7 @@ object ZIOEffects {
   // map + flatMap
   val improved: ZIO[Any, Nothing, Int] = meaningOfLife.map(_ * 2)
   val printing: ZIO[Any, Nothing, Unit] = meaningOfLife.flatMap(v => ZIO.succeed(println(v)))
+
   // for-comprehensions
   val smallProgram: ZIO[Any, Nothing, Unit] = for {
     _ <- ZIO.succeed(println("What is your name?"))
@@ -91,10 +94,12 @@ object ZIOEffects {
     } yield resultA
 
   // TODO 3: run a ZIO forever
+  //@tailrec
   def runForever[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, A] =
     for {
       result <- runForever(zio)
     } yield result
+
 /*
   val endlessLoop: UIO[Unit] = runForever {
     ZIO.succeed {
@@ -103,12 +108,11 @@ object ZIOEffects {
     }
   }
 */
-
   // TODO 4: convert the value of a ZIO to something else
   def convert[R, E, A, B](zio: ZIO[R, E, A], value: B): ZIO[R, E, B] =
     for {
-      value <- zio
-    } yield value.asInstanceOf[B]
+      _ <- zio
+    } yield value
 
   // TODO 5: discard the value of a ZIO to Unit
   def asUnit[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, Unit] =
@@ -127,6 +131,23 @@ object ZIOEffects {
     Unsafe.unsafeCompat { implicit u: Unsafe =>
       val molEval = runtime.unsafe.run(meaningOfLife)
       println(molEval)
+      // 1
+      val firstZIO = runtime.unsafe.run(sequenceTakeLast(aSuccessfulIO, aSuccessfulTask))
+      println(firstZIO) // Success(89)
+      // 2
+      val secondZIO = runtime.unsafe.run(sequenceTakeFirst(aSuccessfulIO, aSuccessfulTask))
+      println(secondZIO) // Success(34)
+      // 3
+
+      // 4
+      val fourthZIO = runtime.unsafe.run(convert(aUIO, "99 converted"))
+      println(fourthZIO)// 99 => Success("99 converted")
+      // 5
+      val fifthZIO = runtime.unsafe.run(asUnit(aUIO))
+      println(fifthZIO) // 99 => Success(())
+
+      // Interesting. If a ZIO fails, it returns the error channel wrapped.
+      // The actual yield value is only returned (wrapped) in case of success(es)
     }
   }
 }
