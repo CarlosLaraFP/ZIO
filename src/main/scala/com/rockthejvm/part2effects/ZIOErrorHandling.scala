@@ -15,7 +15,7 @@ object ZIOErrorHandling extends ZIOAppDefault {
   val failedWithDescription: IO[String, Int] = failedWithThrowable.mapError(_.getMessage)
 
   // attempt: run an effect that might throw an exception
-  val badZIO = ZIO.succeed {
+  val badZIO: UIO[Int] = ZIO.succeed {
     println("Running...")
     val string: String = null
     string.length
@@ -29,6 +29,7 @@ object ZIOErrorHandling extends ZIOAppDefault {
 
   // effectfully catch errors (end result is an effect as well)
   val catchError: UIO[Any] = anAttempt.catchAll(e => ZIO.succeed(s"Returning a different value because $e")) // catchAll eliminates error channel
+  // UIO[Any] because Any is the lowest common ancestor of Int and String
 
   // catchSome keeps Throwable error channel because the partial function cannot guarantee at compile time that we will be able to treat all error cases
   // catchSome can also broaden the error type in the resulting expression because branches can fail with different error channel than Throwable (final: lowest common ancestor)
@@ -38,8 +39,12 @@ object ZIOErrorHandling extends ZIOAppDefault {
   }
 
 
-  override def run: ZIO[Any, Any, Any] = for {
-    effectA <- aFailedZIO
-    effectB <- failedWithDescription
-  } yield effectB
+  override def run: ZIO[Any, Any, Any] = {
+    val composedErrorHandledEffects = for {
+      effectA <- catchError
+      effectB <- catchSelective
+    } yield List(effectB, effectA)
+
+    composedErrorHandledEffects.map(println)
+  }
 }
