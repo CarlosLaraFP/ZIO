@@ -3,7 +3,7 @@ package com.rockthejvm.part2effects
 import zio._
 
 object ZIOApps extends ZIOAppDefault {
-  // TODO: ZIOAppDefault provides Runtime, Trace [across JVM threads], and everything needed to evaluate ZIO effects
+  // TODO: ZIOAppDefault provides Runtime [thread pool], Trace [across JVM threads], and everything needed to evaluate ZIO effects
 
   // TODO: This is the fundamental entry point of the ZIO application that runs one giant composed effect (effect chains)
   // TODO: Spinning up of the entire application infrastructure (i.e. HttpService, Database, ...)
