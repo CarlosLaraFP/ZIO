@@ -229,6 +229,14 @@ object ZIOErrorHandling extends ZIOAppDefault {
   // Identical to above (built-in from ZIO)
   def betterLookupProfileZIO(userId: String): ZIO[Any, Option[QueryError], UserProfile] = lookupProfile(userId).some
 
+  /*
+    TODO:
+      - Errors are expected failures present in the type signature
+      - Defects are unforeseen failures not present in the type signature
+      * Narrow failure types based on domain error model and leave the rest as defects
+      * Treat failure  causes, including defects, with foldCauseZIO(cause => ..., value => ...)
+  */
+
 
   override def run: ZIO[Any, Any, Any] = {
 
