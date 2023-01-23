@@ -86,6 +86,7 @@ object ZIOErrorHandling extends ZIOAppDefault {
   val failEitherToZIO: IO[Int, String] = fromEither(Left(500))
 
   /*
+    TODO:
   ` Errors: Failures present in the type signature of a ZIO
     Defects: Not present in the type signature of a ZIO & unrecoverable/unforeseen (i.e. the bad ZIO above)
 
@@ -141,6 +142,72 @@ object ZIOErrorHandling extends ZIOAppDefault {
     case e => e.getMessage
   }
 
+  /*
+    Combine effects with different errors through combinators
+  */
+  trait ApplicationError
+  case class IndexError(message: String) extends ApplicationError
+  case class DbError(message: String) extends ApplicationError
+
+  val callApi: IO[IndexError, String] = ZIO.succeed("page: html...")
+  val queryDb: IO[DbError, Int] = ZIO.succeed(1)
+  // Product is the lowest common ancestor of completely unrelated case classes (combined error channel)
+  val combined: IO[ApplicationError, (String, Int)] = for {
+    page <- callApi
+    rows <- queryDb
+  } yield (page, rows) // lost type safety (i.e. Product is useless as a resulting error channel)
+
+  // Scala 3 only
+  // val combined: IO[IndexError | DbError, (String, Int)]
+
+  /*
+    TODO: Solutions =>
+      - Include an error model in the domain-driven design, especially if using typed errors like above (same priority as regular data models)
+      - Use Scala 3 union types with pattern matching
+      - use .mapError to some common error type
+  */
+
+  // TODO 1: Make this effect fail with a TYPED error (surfaced to the type signature of the ZIO)
+  //val aBadFailure: ZIO[Any, Nothing, Int] = ZIO.succeed[Int](throw new RuntimeException("This is bad!"))
+  val betterFailure: IO[RuntimeException, Int] = ZIO.fail(new RuntimeException("This is better!"))
+
+  // TODO 2: Transform a ZIO that can fail with Throwable into a ZIO with a narrower exception type
+  // RIO == ZIO[R, Throwable, A]
+  def ioException[R, A](zio: RIO[R, A]): ZIO[R, IOException, A] = zio.refineOrDie[IOException] {
+    case e: IOException => e
+    case _: Throwable => new IOException("Non-IOException error swallowed.")
+  }
+
+  // TODO 3:
+  def left[R, E, A, B](zio: ZIO[R, E, Either[A, B]]): ZIO[R, Either[E, A], B] =
+    zio.foldZIO(
+      e => ZIO.fail(Left(e)),
+      v => v match {
+        case Left(x) => ZIO.fail(Right(x))
+        case Right(y) => ZIO.succeed(y)
+      }
+    )
+
+  val leftZIO: ZIO[Any, RuntimeException, Either[String, Int]] =
+
+  // TODO 4
+  val database: Map[String, Int] = Map(
+    "Daniel" -> 123,
+    "Alice" -> 789
+  )
+  case class QueryError(reason: String)
+  case class UserProfile(name: String, phone: Int)
+
+  def lookupProfile(userId: String): IO[QueryError, Option[UserProfile]] =
+    if (userId != userId.toLowerCase)
+      ZIO.fail(QueryError("User ID format is invalid"))
+    else
+      ZIO.succeed(database.get(userId).map(phone => UserProfile(userId, phone)))
+
+  // TODO 4: Surface out all the failed cases of this API
+  // all failure cases stored in the error channel of the returned ZIO
+  def betterLookupProfile(userId: String): ZIO[Any, Any, UserProfile] = ???
+
 
   override def run: ZIO[Any, Any, Any] = {
 
@@ -150,7 +217,10 @@ object ZIOErrorHandling extends ZIOAppDefault {
       effectC <- eitherToZIO
       effectD <- successEitherToZIO
       effectE <- failEitherToZIO.catchAll(e => ZIO.succeed(e.toString))
-    } yield Vector(effectA, effectB, effectC, effectD, effectE)
+      effectF <- betterFailure.catchAll(e => ZIO.succeed(e.toString))
+      effectG <- ioException(anAttempt).catchAll(e => ZIO.succeed(e.toString))
+      effectH <- left()
+    } yield Vector(effectA, effectB, effectC, effectD, effectE, effectF, effectG)
 
     composedErrorHandledEffects.map(println)
   }
