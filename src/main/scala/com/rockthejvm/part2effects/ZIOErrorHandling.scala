@@ -168,23 +168,28 @@ object ZIOErrorHandling extends ZIOAppDefault {
   */
 
   // TODO 1: Make this effect fail with a TYPED error (surfaced to the type signature of the ZIO)
-  //val aBadFailure: ZIO[Any, Nothing, Int] = ZIO.succeed[Int](throw new RuntimeException("This is bad!"))
+  val aBadFailure: ZIO[Any, Nothing, Int] = ZIO.succeed[Int](throw new RuntimeException("This is bad!"))
+
   val betterFailure: IO[RuntimeException, Int] = ZIO.fail(new RuntimeException("This is better!"))
+
+  val badFailureTyped: Task[Int] = aBadFailure unrefine { case e => e } // surfaces out the exception in the error channel
+  val badFailureCause: IO[Cause[RuntimeException], Int] = aBadFailure.sandbox // exposes defect in the Cause
 
   // TODO 2: Transform a ZIO that can fail with Throwable into a ZIO with a narrower exception type
   // RIO == ZIO[R, Throwable, A]
-  def ioException[R, A](zio: RIO[R, A]): ZIO[R, IOException, A] = zio.refineOrDie[IOException] {
-    case e: IOException => e
-    case _: Throwable => new IOException("Non-IOException error swallowed.")
+  def ioException[R, A](zio: RIO[R, A]): ZIO[R, IOException, A] = zio.refineOrDie {
+    case e: IOException => e // any other exception type is a defect
+      // in practice, this is a domain model object
   }
+  // Defects enable for-comprehension short-circuiting, but so do uncaught errors
 
   // TODO 3:
   def left[R, E, A, B](zio: ZIO[R, E, Either[A, B]]): ZIO[R, Either[E, A], B] =
     zio.foldZIO(
       e => ZIO.fail(Left(e)),
       v => v match {
-        case Left(x) => ZIO.fail(Right(x))
-        case Right(y) => ZIO.succeed(y)
+        case Left(a) => ZIO.fail(Right(a))
+        case Right(b) => ZIO.succeed(b)
       }
     )
 
@@ -212,10 +217,17 @@ object ZIOErrorHandling extends ZIOAppDefault {
 
   // TODO 4: Surface out all the failed cases of this API
   // all failure cases stored in the error channel of the returned ZIO
-  def betterLookupProfile(userId: String): ZIO[Any, Any, UserProfile] = ZIO.attempt {
-    if (userId != userId.toLowerCase) throw new IllegalArgumentException("User ID must be lower case.")
-    UserProfile(userId, database(userId))
-  }
+  def betterLookupProfile(userId: String): ZIO[Any, Option[QueryError], UserProfile] =
+    lookupProfile(userId).foldZIO(
+      e => ZIO.fail(Some(e)),
+      profileOption => profileOption match {
+        case None => ZIO.fail(None)
+        case Some(profile) => ZIO.succeed(profile)
+      }
+    )
+
+  // Identical to above (built-in from ZIO)
+  def betterLookupProfileZIO(userId: String): ZIO[Any, Option[QueryError], UserProfile] = lookupProfile(userId).some
 
 
   override def run: ZIO[Any, Any, Any] = {
