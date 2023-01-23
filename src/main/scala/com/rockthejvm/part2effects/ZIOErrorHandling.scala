@@ -188,7 +188,13 @@ object ZIOErrorHandling extends ZIOAppDefault {
       }
     )
 
-  val leftZIO: ZIO[Any, RuntimeException, Either[String, Int]] =
+  val leftZIO: ZIO[Any, Throwable, Either[String, Int]] = ZIO.attempt {
+    val r = new scala.util.Random
+    val randomIntFirst = r.between(0, 2)
+    val randomIntSecond = r.between(0, 2)
+    val number = randomIntFirst / randomIntSecond // could throw
+    if (number == 0) Left("Division = 0") else Right(number)
+  }
 
   // TODO 4
   val database: Map[String, Int] = Map(
@@ -219,8 +225,8 @@ object ZIOErrorHandling extends ZIOAppDefault {
       effectE <- failEitherToZIO.catchAll(e => ZIO.succeed(e.toString))
       effectF <- betterFailure.catchAll(e => ZIO.succeed(e.toString))
       effectG <- ioException(anAttempt).catchAll(e => ZIO.succeed(e.toString))
-      effectH <- left()
-    } yield Vector(effectA, effectB, effectC, effectD, effectE, effectF, effectG)
+      effectH <- left(leftZIO).catchAll(e => ZIO.succeed(e.toString))
+    } yield Vector(effectA, effectB, effectC, effectD, effectE, effectF, effectG, effectH)
 
     composedErrorHandledEffects.map(println)
   }
