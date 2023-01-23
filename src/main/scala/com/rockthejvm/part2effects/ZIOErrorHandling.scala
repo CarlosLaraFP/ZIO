@@ -198,8 +198,8 @@ object ZIOErrorHandling extends ZIOAppDefault {
 
   // TODO 4
   val database: Map[String, Int] = Map(
-    "Daniel" -> 123,
-    "Alice" -> 789
+    "daniel" -> 123,
+    "alice" -> 789
   )
   case class QueryError(reason: String)
   case class UserProfile(name: String, phone: Int)
@@ -212,7 +212,10 @@ object ZIOErrorHandling extends ZIOAppDefault {
 
   // TODO 4: Surface out all the failed cases of this API
   // all failure cases stored in the error channel of the returned ZIO
-  def betterLookupProfile(userId: String): ZIO[Any, Any, UserProfile] = ???
+  def betterLookupProfile(userId: String): ZIO[Any, Any, UserProfile] = ZIO.attempt {
+    if (userId != userId.toLowerCase) throw new IllegalArgumentException("User ID must be lower case.")
+    UserProfile(userId, database(userId))
+  }
 
 
   override def run: ZIO[Any, Any, Any] = {
@@ -226,7 +229,10 @@ object ZIOErrorHandling extends ZIOAppDefault {
       effectF <- betterFailure.catchAll(e => ZIO.succeed(e.toString))
       effectG <- ioException(anAttempt).catchAll(e => ZIO.succeed(e.toString))
       effectH <- left(leftZIO).catchAll(e => ZIO.succeed(e.toString))
-    } yield Vector(effectA, effectB, effectC, effectD, effectE, effectF, effectG, effectH)
+      effectI <- betterLookupProfile("alice")
+      effectJ <- betterLookupProfile("Daniel").catchAll(e => ZIO.succeed(e.toString))
+      effectK <- betterLookupProfile("bob").catchAll(e => ZIO.succeed(e.toString))
+    } yield Vector(effectA, effectB, effectC, effectD, effectE, effectF, effectG, effectH, effectI, effectJ, effectK)
 
     composedErrorHandledEffects.map(println)
   }
