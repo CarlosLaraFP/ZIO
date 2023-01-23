@@ -22,7 +22,7 @@ object ZIODependencies extends ZIOAppDefault {
 
   class EmailService {
     def email(user: User): Task[Unit] =
-      ZIO.succeed(s"You have just been subscribed. Welcome, ${user.name}!").unit
+      ZIO.succeed(println(s"You have just been subscribed. Welcome, ${user.name}!"))
   }
 
   object EmailService {
@@ -73,10 +73,55 @@ object ZIODependencies extends ZIOAppDefault {
   */
 
   def subscribe(user: User): Task[Unit] = for {
-    sub <- subscriptionService
+    sub <- subscriptionService // service is instantiated at the point of call (imagine a million instances concurrently)
     _ <- sub.subscribeUser(user)
   } yield ()
 
+  /*
+    TODO:
+      - risk leaking resources if you subscribe multiple users in the same program
+      - oblivious to many instances running simultaneously
+  */
 
-  override def run: ZIO[Any, Any, Any] = subscribe(User("Daniel", "email@email.com"))
+  val program: Task[Unit] = for {
+    _ <- subscribe(User("Alice", ""))
+    _ <- subscribe(User("Bob", ""))
+    _ <- subscribe(User("Charlie", ""))
+  } yield ()
+
+  // alternative
+  def subscribeBetter(user: User): ZIO[UserSubscription, Throwable, Unit] = for {
+    sub <- ZIO.service[UserSubscription] // ZIO[UserSubscription, Nothing, UserSubscription]
+    _ <- sub.subscribeUser(user)
+  } yield ()
+
+  val programBetter: ZIO[UserSubscription, Throwable, Unit] = for {
+    _ <- subscribeBetter(User("Alice", ""))
+    _ <- subscribeBetter(User("Bob", ""))
+    _ <- subscribeBetter(User("Charlie", ""))
+  } yield ()
+
+  /*
+    TODO: Advantages
+      - we don't need to care about dependencies until the end of the world
+      - resource leaks eliminated because all ZIOs requiring a dependency will use the same instance
+      - can use different instances of the same type for different needs (i.e. testing)
+      - ZLayers can be created and composed much like regular ZIOs, with a very rich API
+  */
+
+  // ZLayers
+
+
+
+  override def run: ZIO[Any, Any, Any] = programBetter.provideLayer(
+    ZLayer.succeed(
+      UserSubscription.create(
+        EmailService.create(),
+        UserDatabase.create(
+          ConnectionPool.create(10)
+        )
+      )
+    )
+  )
+    //subscribe(User("Daniel", "email@email.com"))
 }
