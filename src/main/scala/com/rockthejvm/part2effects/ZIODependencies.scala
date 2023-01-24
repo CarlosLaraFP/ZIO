@@ -1,6 +1,8 @@
 package com.rockthejvm.part2effects
 
-import zio._
+import zio.*
+
+import java.io.IOException
 
 object ZIODependencies extends ZIOAppDefault {
 
@@ -93,10 +95,52 @@ object ZIODependencies extends ZIOAppDefault {
   val userSubscriptionLayer: ZLayer[Any, Nothing, UserSubscription] =
     subscriptionRequirementsLayer >>> userSubscriptionServiceLayer
 
+  //val runnable: Task[Double] = programBetter.provide(userSubscriptionLayer)
+
   /*
     TODO: Best practices =>
       - create layers in the companion objects of the services you want to expose
+      - ZIO magic (compile-time macro-based graph traversal algorithm by inspecting type signatures)
+      - Already provided services: Clock, Random, System, Console
   */
 
-  override def run: ZIO[Any, Any, Any] = programBetter.provide(userSubscriptionLayer)
+  val runnableProgram: Task[Double] = programBetter.provide(
+    UserSubscription.live,
+    EmailService.live,
+    UserDatabase.live,
+    ConnectionPool.live(10),
+    //ZLayer.Debug.tree
+    ZLayer.Debug.mermaid // logs the dependency graph and provides link
+  )
+
+  // More Magic
+  val userSubscriptionLayerMagic: ZLayer[Any, Nothing, UserSubscription] =
+    ZLayer.make[UserSubscription](
+      UserSubscription.live,
+      EmailService.live,
+      UserDatabase.live,
+      ConnectionPool.live(10)
+    )
+
+  // passthrough
+  val dbWithPoolLayer: ZLayer[ConnectionPool, Nothing, UserDatabase with ConnectionPool] =
+    UserDatabase.live.passthrough
+
+  // service = take a dependency and expose it as a value for further layers
+  val dbService: ZLayer[UserDatabase, Nothing, UserDatabase] =
+    ZLayer.service[UserDatabase]
+
+  // launch: Starts a ZIO effect that never finishes given dependencies
+  val subscriptionLaunch: ZIO[EmailService with UserDatabase, Nothing, Nothing] =
+    UserSubscription.live.launch
+
+  // memoization: Once a layer is instantiated, the same instance will be reused in all the layers that require it (by default unless live.fresh)
+
+  // All 4 singletons included by default with ZIOAppDefault
+  val getTime: UIO[Long] = Clock.currentTime(java.util.concurrent.TimeUnit.SECONDS)
+  val randomValue: UIO[RuntimeFlags] = Random.nextInt
+  val getEnvVariable: IO[SecurityException, Option[String]] = System.env("aws.region")
+  val printlnEffect: IO[IOException, Unit] = Console.printLine("This is ZIO")
+
+  override def run: ZIO[Any, Any, Any] = runnableProgram
 }
