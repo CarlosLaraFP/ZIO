@@ -5,53 +5,7 @@ import zio._
 object ZIODependencies extends ZIOAppDefault {
 
   // app to subscribe users to newsletter
-  case class User(name: String, email: String)
-
-  class UserSubscription(emailService: EmailService, userDatabase: UserDatabase) {
-    def subscribeUser(user: User): Task[Unit] =
-      for {
-        _ <- emailService.email(user)
-        _ <- userDatabase.insert(user)
-      } yield ()
-  }
-
-  object UserSubscription {
-    def create(emailService: EmailService, userDatabase: UserDatabase): UserSubscription =
-      new UserSubscription(emailService, userDatabase)
-  }
-
-  class EmailService {
-    def email(user: User): Task[Unit] =
-      ZIO.succeed(println(s"You have just been subscribed. Welcome, ${user.name}!"))
-  }
-
-  object EmailService {
-    def create(): EmailService = new EmailService
-  }
-
-  class UserDatabase(connectionPool: ConnectionPool) {
-    def insert(user: User): Task[Unit] =
-      for {
-        conn <- connectionPool.get
-        _ <- conn.runQuery(s"INSERT INTO subscribers(name, email) VALUES ($user.name}, ${user.email}")
-      } yield ()
-  }
-
-  object UserDatabase {
-    def create(connectionPool: ConnectionPool): UserDatabase = new UserDatabase(connectionPool)
-  }
-
-  class ConnectionPool(nConnections: Int) {
-    def get: Task[Connection] = ZIO.succeed(println("Acquired connection")) *> ZIO.succeed(Connection())
-  }
-
-  object ConnectionPool {
-    def create(nConnections: Int) = new ConnectionPool(nConnections)
-  }
-
-  case class Connection() {
-    def runQuery(query: String): Task[Unit] = ZIO.succeed(println(s"Executing query: $query"))
-  }
+  import ServiceModel._
 
 
   // Dependency injection
@@ -90,16 +44,16 @@ object ZIODependencies extends ZIOAppDefault {
   } yield ()
 
   // alternative
-  def subscribeBetter(user: User): ZIO[UserSubscription, Throwable, Unit] = for {
+  def subscribeBetter(user: User): ZIO[UserSubscription, Throwable, Double] = for {
     sub <- ZIO.service[UserSubscription] // ZIO[UserSubscription, Nothing, UserSubscription]
     _ <- sub.subscribeUser(user)
-  } yield ()
+  } yield 12.12
 
-  val programBetter: ZIO[UserSubscription, Throwable, Unit] = for {
+  val programBetter: ZIO[UserSubscription, Throwable, Double] = for {
     _ <- subscribeBetter(User("Alice", ""))
     _ <- subscribeBetter(User("Bob", ""))
     _ <- subscribeBetter(User("Charlie", ""))
-  } yield ()
+  } yield 12.12
 
   /*
     TODO: Advantages
@@ -110,18 +64,39 @@ object ZIODependencies extends ZIOAppDefault {
   */
 
   // ZLayers
+  val connectionPoolLayer: ZLayer[Any, Nothing, ConnectionPool] = ZLayer.succeed(ConnectionPool.create(10))
+  /*
+    A ZLayer that requires a dependency (higher layer) can be built with ZLayer.fromFunction
+    and automatically fetch the function arguments and place them into the ZLayer's dependency/environment type argument.
 
+    Fetching is done through macros at compile time.
+  */
+  val databaseLayer: ZLayer[ConnectionPool, Nothing, UserDatabase] =
+    ZLayer.fromFunction(UserDatabase.create _)
 
+  val emailServiceLayer: ZLayer[Any, Nothing, EmailService] =
+    ZLayer.succeed(EmailService.create())
 
-  override def run: ZIO[Any, Any, Any] = programBetter.provideLayer(
-    ZLayer.succeed(
-      UserSubscription.create(
-        EmailService.create(),
-        UserDatabase.create(
-          ConnectionPool.create(10)
-        )
-      )
-    )
-  )
-    //subscribe(User("Daniel", "email@email.com"))
+  val userSubscriptionServiceLayer: ZLayer[UserDatabase with EmailService, Nothing, UserSubscription] =
+    ZLayer.fromFunction(UserSubscription.create _)
+
+  // composing layers
+
+  // Vertical Composition
+  val databaseLayerFull: ZLayer[Any, Nothing, UserDatabase] = connectionPoolLayer >>> databaseLayer
+
+  // Horizontal Composition: Combines dependencies of both layers AND the values of both layers (E common ancestor)
+  val subscriptionRequirementsLayer: ZLayer[Any, Nothing, UserDatabase with EmailService] =
+    databaseLayerFull ++ emailServiceLayer
+
+  // mix & match
+  val userSubscriptionLayer: ZLayer[Any, Nothing, UserSubscription] =
+    subscriptionRequirementsLayer >>> userSubscriptionServiceLayer
+
+  /*
+    TODO: Best practices =>
+      - create layers in the companion objects of the services you want to expose
+  */
+
+  override def run: ZIO[Any, Any, Any] = programBetter.provide(userSubscriptionLayer)
 }
