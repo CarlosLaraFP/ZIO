@@ -87,8 +87,14 @@ object Fibers extends ZIOAppDefault {
       b <- fiberB.join
     } yield (a, b)
 
-    tuple.fork
+    tuple.debugThread.fork
   }
+
+  val testFibers: UIO[(Fiber[Nothing, String], Fiber[Nothing, String])] =
+    for {
+      fiberA <- ZIO.succeed("First").debugThread.fork
+      fiberB <- ZIO.succeed("Second").debugThread.fork
+    } yield (fiberA, fiberB)
 
 
   // TODO 2: same as above, but with orElse
@@ -115,6 +121,11 @@ object Fibers extends ZIOAppDefault {
   // TODO 3: Use 10 Fibers to count the number of words in all the generated files and then aggregate all the results
   // TODO classic MapReduce problem: Spawn N Fibers, count the N of words in each file, then aggregate all the results in one big number
 
-  override def run: ZIO[Any, Any, Any] = ???
+  override def run: ZIO[Any, Any, Any] = {
+    for {
+      fibers <- testFibers
+      zippedFiber <- zipFibers(fibers._1, fibers._2)
+    } yield zippedFiber.await
+  }
   //ZIO.succeed((1 to 10).foreach(i => generateRandomFile(s"src/main/resources/testfile_$i.txt")))
 }
