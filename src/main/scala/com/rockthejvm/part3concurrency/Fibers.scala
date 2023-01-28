@@ -80,25 +80,31 @@ object Fibers extends ZIOAppDefault {
 
   // Exercises
 
+  def testFibers(debug: String): UIO[(Fiber[Nothing, String], Fiber[Nothing, String])] =
+    for {
+      fiberA <- ZIO.succeed(s"$debug: First").debugThread.fork
+      fiberB <- ZIO.succeed(s"$debug: Second").debugThread.fork
+    } yield (fiberA, fiberB)
+
   // TODO 1: zip two Fibers using fork and join, without the zip combinator (hint: create a fiber that waits for both)
   def zipFibers[E, A, B](fiberA: Fiber[E, A], fiberB: Fiber[E, B]): UIO[Fiber[E, (A, B)]] = {
-    val tuple = for {
+    val tupleEffect = for {
       a <- fiberA.join
       b <- fiberB.join
     } yield (a, b)
 
-    tuple.debugThread.fork
+    tupleEffect.debugThread.fork
   }
 
-  val testFibers: UIO[(Fiber[Nothing, String], Fiber[Nothing, String])] =
-    for {
-      fiberA <- ZIO.succeed("First").debugThread.fork
-      fiberB <- ZIO.succeed("Second").debugThread.fork
-    } yield (fiberA, fiberB)
-
-
   // TODO 2: same as above, but with orElse
-  def chainFibers[E, A](fiberA: Fiber[E, A], fiberB: Fiber[E, A]): UIO[Fiber[E, A]] = ???
+  def chainFibers[E, A](fiberA: Fiber[E, A], fiberB: Fiber[E, A]): UIO[Fiber[E, A]] = {
+    for {
+      resultA <- fiberA.await
+    } yield resultA match {
+      case Exit.Success(_) => fiberA
+      case Exit.Failure(_) => fiberB
+    }
+  }
 
   // TODO 3: distributing tasks in between many fibers
   def generateRandomFile(path: String): Unit = {
@@ -123,9 +129,11 @@ object Fibers extends ZIOAppDefault {
 
   override def run: ZIO[Any, Any, Any] = {
     for {
-      fibers <- testFibers
-      zippedFiber <- zipFibers(fibers._1, fibers._2)
-    } yield zippedFiber.await
+      fibersOne <- testFibers("zipFibers")
+      zippedFiber <- zipFibers(fibersOne._1, fibersOne._2)
+      fibersTwo <- testFibers("chainFibers")
+      chainedFiber <- chainFibers(fibersTwo._1, fibersTwo._2)
+    } yield (zippedFiber.await, chainedFiber.await)
   }
   //ZIO.succeed((1 to 10).foreach(i => generateRandomFile(s"src/main/resources/testfile_$i.txt")))
 }
