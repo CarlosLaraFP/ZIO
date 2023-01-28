@@ -1,7 +1,9 @@
 package com.rockthejvm.part3concurrency
 
-import zio._
-import com.rockthejvm.utils._
+import zio.*
+import com.rockthejvm.utils.*
+
+import java.io.{File, FileWriter}
 
 object Fibers extends ZIOAppDefault {
 
@@ -76,5 +78,43 @@ object Fibers extends ZIOAppDefault {
     message <- fiber.join
   } yield message
 
-  override def run: ZIO[Any, Any, Any] = chainedFibers.debugThread
+  // Exercises
+
+  // TODO 1: zip two Fibers using fork and join, without the zip combinator (hint: create a fiber that waits for both)
+  def zipFibers[E, A, B](fiberA: Fiber[E, A], fiberB: Fiber[E, B]): UIO[Fiber[E, (A, B)]] = {
+    val tuple = for {
+      a <- fiberA.join
+      b <- fiberB.join
+    } yield (a, b)
+
+    tuple.fork
+  }
+
+
+  // TODO 2: same as above, but with orElse
+  def chainFibers[E, A](fiberA: Fiber[E, A], fiberB: Fiber[E, A]): UIO[Fiber[E, A]] = ???
+
+  // TODO 3: distributing tasks in between many fibers
+  def generateRandomFile(path: String): Unit = {
+    val random = scala.util.Random
+    val chars = 'a' to 'z'
+    val nWords = random.nextInt(2000) // at most 2000 random words
+    val content = (1 to nWords)
+      .map(_ =>
+        (1 to random.nextInt(10))
+          .map(_ => chars(random.nextInt(26)))
+          .mkString
+      ) // one word for every 1 to nWords
+      .mkString(" ")
+
+    val writer = new FileWriter(new File(path))
+    writer.write(content)
+    writer.flush()
+    writer.close()
+  }
+  // TODO 3: Use 10 Fibers to count the number of words in all the generated files and then aggregate all the results
+  // TODO classic MapReduce problem: Spawn N Fibers, count the N of words in each file, then aggregate all the results in one big number
+
+  override def run: ZIO[Any, Any, Any] = ???
+  //ZIO.succeed((1 to 10).foreach(i => generateRandomFile(s"src/main/resources/testfile_$i.txt")))
 }
