@@ -3,7 +3,7 @@ package com.rockthejvm.part3concurrency
 import zio.*
 import com.rockthejvm.utils.*
 
-import java.io.{File, FileWriter}
+import java.io.{File, FileReader, FileWriter}
 
 object Fibers extends ZIOAppDefault {
 
@@ -87,7 +87,8 @@ object Fibers extends ZIOAppDefault {
     } yield (fiberA, fiberB)
 
   // TODO 1: zip two Fibers using fork and join, without the zip combinator (hint: create a fiber that waits for both)
-  def zipFibers[E, A, B](fiberA: Fiber[E, A], fiberB: Fiber[E, B]): UIO[Fiber[E, (A, B)]] = {
+  // the below implementation is temporary and not ideal (interruptions, synchrony, ...)
+  def zipFibers[E, X <: E, Y <: E, A, B](fiberA: Fiber[X, A], fiberB: Fiber[Y, B]): UIO[Fiber[E, (A, B)]] = {
     val tupleEffect = for {
       a <- fiberA.join
       b <- fiberB.join
@@ -97,14 +98,11 @@ object Fibers extends ZIOAppDefault {
   }
 
   // TODO 2: same as above, but with orElse
-  def chainFibers[E, A](fiberA: Fiber[E, A], fiberB: Fiber[E, A]): UIO[Fiber[E, A]] = {
-    for {
-      resultA <- fiberA.await
-    } yield resultA match {
-      case Exit.Success(_) => fiberA
-      case Exit.Failure(_) => fiberB
-    }
-  }
+  def chainFibers[E, A](fiberA: Fiber[E, A], fiberB: Fiber[E, A]): UIO[Fiber[E, A]] =
+    fiberA
+      .join
+      .orElse(fiberB.join)
+      .fork
 
   // TODO 3: distributing tasks in between many fibers
   def generateRandomFile(path: String): Unit = {
@@ -113,7 +111,7 @@ object Fibers extends ZIOAppDefault {
     val nWords = random.nextInt(2000) // at most 2000 random words
     val content = (1 to nWords)
       .map(_ =>
-        (1 to random.nextInt(10))
+        (1 to random.nextInt(10)) // at most 10 characters per word
           .map(_ => chars(random.nextInt(26)))
           .mkString
       ) // one word for every 1 to nWords
@@ -123,17 +121,53 @@ object Fibers extends ZIOAppDefault {
     writer.write(content)
     writer.flush()
     writer.close()
+    /*
+      When data is written to a file, it may not be immediately written to the physical storage device.
+      Instead, it may be temporarily stored in a buffer, or a temporary holding area in memory.
+      "Flushing" the buffer means to write any data that is currently stored in the buffer to the actual file on disk,
+      so that it can be accessed by other processes. This can be important for ensuring that data is not lost in the event of a
+      crash or power failure, as well as for allowing other processes to read the file as soon as possible after it is written.
+    */
   }
   // TODO 3: Use 10 Fibers to count the number of words in all the generated files and then aggregate all the results
   // TODO classic MapReduce problem: Spawn N Fibers, count the N of words in each file, then aggregate all the results in one big number
+  def countWords(filePath: String): UIO[Int] =
+    ZIO.succeed {
+      val source = scala.io.Source.fromFile(filePath)
+      val nWords = source.getLines.toList.head.split(" ").count(_.nonEmpty)
+      source.close
+      nWords
+    }
 
-  override def run: ZIO[Any, Any, Any] = {
+  // cats.Semigroup?
+  def wordCountParallel(n: Int): UIO[Int] = {
+    (1 to n).toList
+      .map(i => s"src/main/resources/testfile_$i.txt") // paths
+      .map(countWords) // list of effects
+      .map(_.fork) // list of effects returning fibers
+      .map((fiberEffect: UIO[Fiber[Nothing, Int]]) => fiberEffect.flatMap(_.join)) // list of effects returning values (count of words)
+      .reduce((effectA, effectB) => for {
+        countA <- effectA
+        countB <- effectB
+      } yield countA + countB)
+
+    //val effects = (1 to n)
+    //  .map(i => countWords(s"src/main/resources/testfile_$i.txt").fork)
+    //  .map((fiberEffect: UIO[Fiber[Nothing, Int]]) => fiberEffect.flatMap(_.join))
+  }
+
+    //x.flatMap(i => countWords(s"src/main/resources/testfile_$i.txt").map(j => j.join))
+
+
+  override def run: ZIO[Any, Any, Any] =
+
     for {
       fibersOne <- testFibers("zipFibers")
       zippedFiber <- zipFibers(fibersOne._1, fibersOne._2)
       fibersTwo <- testFibers("chainFibers")
       chainedFiber <- chainFibers(fibersTwo._1, fibersTwo._2)
+      x <- ZIO.succeed((1 to 10).map(i => countWords(s"src/main/resources/testfile_$i.txt")))
     } yield (zippedFiber.await, chainedFiber.await)
-  }
+
   //ZIO.succeed((1 to 10).foreach(i => generateRandomFile(s"src/main/resources/testfile_$i.txt")))
 }
