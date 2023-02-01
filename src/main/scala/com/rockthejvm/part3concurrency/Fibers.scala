@@ -146,19 +146,19 @@ object Fibers extends ZIOAppDefault {
     // Define custom combination
     (zioA, zioB) =>
 
-      val fiberEffects: UIO[Fiber[Nothing, (Int, Int)]] =
+      val combinedFiberEffect: UIO[Fiber[Nothing, (Int, Int)]] =
         for {
           a <- zioA.fork
           b <- zioB.fork
         } yield a zip b
 
-      val combined: UIO[Int] =
+      val combinedEffect: UIO[Int] =
         for {
-          combinedFibers <- fiberEffects
-          tupleResult <- combinedFibers.join
+          combinedFiber <- combinedFiberEffect
+          tupleResult <- combinedFiber.join
         } yield tupleResult._1 + tupleResult._2
 
-      combined
+      combinedEffect
   }
   
   // cats.Semigroup to make code more concise
@@ -166,9 +166,9 @@ object Fibers extends ZIOAppDefault {
     (1 to n).toList
       .map(i => s"src/main/resources/testfile_$i.txt") // paths
       .map(countWords) // list of effects
+      .reduce(_ |+| _)
       //.map(_.fork) // list of effects returning fibers
       //.map((fiberEffect: UIO[Fiber[Nothing, Int]]) => fiberEffect.flatMap(_.join)) // list of effects returning values (count of words)
-      .reduce(_ |+| _)
       //.reduce((effectA, effectB) => for {
       //  countA <- effectA
       //  countB <- effectB
