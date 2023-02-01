@@ -1,9 +1,12 @@
 package com.rockthejvm.part3concurrency
 
+import java.io.{File, FileReader, FileWriter}
+
 import zio.*
 import com.rockthejvm.utils.*
+import cats.Semigroup
+import cats.syntax.semigroup._
 
-import java.io.{File, FileReader, FileWriter}
 
 object Fibers extends ZIOAppDefault {
 
@@ -139,35 +142,51 @@ object Fibers extends ZIOAppDefault {
       nWords
     }
 
-  // cats.Semigroup?
+  implicit val zioSemigroup: Semigroup[UIO[Int]] = Semigroup.instance[UIO[Int]] {
+    // Define custom combination
+    (zioA, zioB) =>
+
+      val fiberEffects: UIO[Fiber[Nothing, (Int, Int)]] =
+        for {
+          a <- zioA.fork
+          b <- zioB.fork
+        } yield a zip b
+
+      val combined: UIO[Int] =
+        for {
+          combinedFibers <- fiberEffects
+          tupleResult <- combinedFibers.join
+        } yield tupleResult._1 + tupleResult._2
+
+      combined
+  }
+  
+  // cats.Semigroup to make code more concise
   def wordCountParallel(n: Int): UIO[Int] = {
     (1 to n).toList
       .map(i => s"src/main/resources/testfile_$i.txt") // paths
       .map(countWords) // list of effects
-      .map(_.fork) // list of effects returning fibers
-      .map((fiberEffect: UIO[Fiber[Nothing, Int]]) => fiberEffect.flatMap(_.join)) // list of effects returning values (count of words)
-      .reduce((effectA, effectB) => for {
-        countA <- effectA
-        countB <- effectB
-      } yield countA + countB)
-
-    //val effects = (1 to n)
-    //  .map(i => countWords(s"src/main/resources/testfile_$i.txt").fork)
-    //  .map((fiberEffect: UIO[Fiber[Nothing, Int]]) => fiberEffect.flatMap(_.join))
+      //.map(_.fork) // list of effects returning fibers
+      //.map((fiberEffect: UIO[Fiber[Nothing, Int]]) => fiberEffect.flatMap(_.join)) // list of effects returning values (count of words)
+      .reduce(_ |+| _)
+      //.reduce((effectA, effectB) => for {
+      //  countA <- effectA
+      //  countB <- effectB
+      //} yield countA + countB)
   }
-
-    //x.flatMap(i => countWords(s"src/main/resources/testfile_$i.txt").map(j => j.join))
 
 
   override def run: ZIO[Any, Any, Any] =
 
-    for {
+    val tests = for {
       fibersOne <- testFibers("zipFibers")
       zippedFiber <- zipFibers(fibersOne._1, fibersOne._2)
       fibersTwo <- testFibers("chainFibers")
       chainedFiber <- chainFibers(fibersTwo._1, fibersTwo._2)
-      x <- ZIO.succeed((1 to 10).map(i => countWords(s"src/main/resources/testfile_$i.txt")))
-    } yield (zippedFiber.await, chainedFiber.await)
+      summedWords <- wordCountParallel(10)
+    } yield (summedWords, zippedFiber.join)
+
+    tests.debugThread
 
   //ZIO.succeed((1 to 10).foreach(i => generateRandomFile(s"src/main/resources/testfile_$i.txt")))
 }
