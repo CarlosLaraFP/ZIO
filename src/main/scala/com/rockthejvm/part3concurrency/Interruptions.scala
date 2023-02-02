@@ -81,21 +81,41 @@ object Interruptions extends ZIOAppDefault {
   //  - if zio completes with A before time runs out, the final effect completes with the value;
   //  - if it fails with E, effect completes with e
   //  - if zio takes longer than the allocated time, it will be interrupted
-  def timeout[R, E, A](zio: ZIO[R, E, A], time: Duration): ZIO[R, E, A] =
+  def timeoutFirst[R, E, A](zio: ZIO[R, E, A], time: Duration): ZIO[R, E, A] =
     for {
       taskFiber <- zio.fork
-      _ <- ZIO.sleep(time).onDone(ZIO.succeed(""), _ => taskFiber.interruptFork).forkDaemon
+      _ <- ZIO.sleep(time).onDone(ZIO.succeed(()), _ => taskFiber.interruptFork).fork//Daemon
       result <- taskFiber.join
     } yield result
+
+  // TODO 2: Timeout V2 -> if zio takes longer than the allocated time, return zio with nothing for the value channel
+  //  - successful effect with Some(a)
+  //  - failed effect with e
+  //  - interrupt effect and return successful effect with None
+  def timeout[R, E, A](zio: ZIO[R, E, A], time: Duration): ZIO[R, E, Option[A]] = {
+
+    val timeoutEffect: ZIO[R, E, Option[A]] = ZIO.sleep(time) *> ZIO.succeed(Option.empty[A])
+
+    val taskEffect: ZIO[R, E, Option[A]] =
+      zio.foldCause(c => {
+        println((c.failures.map(_.toString) ::: c.defects.map(_.toString)).mkString(", "))
+        None
+      }, a => Some(a))
+
+    // zio.option absorbs the failure
+
+    timeoutEffect.race(taskEffect)
+  }
 
 
   override def run: ZIO[Any, Any, Any] =
     for {
-      resultA <- timeout(ZIO.succeed("Success A"), 2.seconds)
-      _ <- Console.printLine(resultA)
-      resultB <- timeout(ZIO.fail("B failed"), 2.seconds).catchAll(e => ZIO.succeed(e))
-      _ <- Console.printLine(resultB)
-      resultC <- timeout(ZIO.sleep(3.seconds), 2.seconds)
-      _ <- Console.printLine(resultC)
+      //fiberA <- timeout(ZIO.succeed("Success A"), 20.seconds).fork // leaked fiber if we do not join
+      //fiberA <- timeout(ZIO.sleep(30.seconds), 2.seconds).fork
+      fiberA <- timeout(ZIO.fail("B failed"), 20.seconds).fork
+      result <- fiberA.join
+      _ <- Console.printLine(result.toString)
+      //_ <- timeout(ZIO.fail("B failed"), 2.seconds).catchAll(e => ZIO.succeed(e)).debugThread.fork
+      //_ <- timeout(ZIO.sleep(3.seconds), 2.seconds).debugThread.fork
     } yield ()
 }
