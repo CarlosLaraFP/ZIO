@@ -40,10 +40,25 @@ object Interruptions extends ZIOAppDefault {
       result <- fiber.join
     } yield result
 
+  // Automatic interruptions
+  // outliving a parent fiber
+  val parentEffect: ZIO[Any, Any, String] =
+    ZIO.succeed("Spawning Fiber").debugThread *>
+      zioWithTime.fork *> // child fiber (and longer than the parent effect)
+        ZIO.sleep(1.second) *>
+          ZIO.succeed("Parent successful").debugThread // done here
+
+  val testOutlivingParent: ZIO[Any, Any, Unit] =
+    for {
+      parentFiber <- parentEffect.fork
+      _ <- ZIO.sleep(3.seconds)
+      _ <- parentFiber.join
+    } yield ()
+
 
   override def run: ZIO[Any, Any, Any] =
     for {
-      result <- asyncInterruption
+      result <- testOutlivingParent
       _ <- Console.printLine(result)
     } yield ()
 }
