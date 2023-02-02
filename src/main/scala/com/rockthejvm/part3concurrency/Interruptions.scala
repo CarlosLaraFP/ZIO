@@ -77,10 +77,25 @@ object Interruptions extends ZIOAppDefault {
 
   val testRace: UIO[Unit] = race.fork *> ZIO.sleep(3.seconds)
 
+  // TODO 1: Implement timeout function
+  //  - if zio completes with A before time runs out, the final effect completes with the value;
+  //  - if it fails with E, effect completes with e
+  //  - if zio takes longer than the allocated time, it will be interrupted
+  def timeout[R, E, A](zio: ZIO[R, E, A], time: Duration): ZIO[R, E, A] =
+    for {
+      taskFiber <- zio.fork
+      _ <- ZIO.sleep(time).onDone(ZIO.succeed(""), _ => taskFiber.interruptFork).forkDaemon
+      result <- taskFiber.join
+    } yield result
+
 
   override def run: ZIO[Any, Any, Any] =
     for {
-      result <- testRace
-      _ <- Console.printLine(result)
+      resultA <- timeout(ZIO.succeed("Success A"), 2.seconds)
+      _ <- Console.printLine(resultA)
+      resultB <- timeout(ZIO.fail("B failed"), 2.seconds).catchAll(e => ZIO.succeed(e))
+      _ <- Console.printLine(resultB)
+      resultC <- timeout(ZIO.sleep(3.seconds), 2.seconds)
+      _ <- Console.printLine(resultC)
     } yield ()
 }
