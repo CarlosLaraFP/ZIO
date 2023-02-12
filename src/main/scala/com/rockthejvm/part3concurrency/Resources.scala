@@ -94,9 +94,12 @@ object Resources extends ZIOAppDefault {
 
   def acquireOpenFile(path: String): UIO[Unit] =
     ZIO.acquireReleaseWith(
-      openFileScanner(path)
+      ZIO.succeed("Starting file scan...") *> openFileScanner(path)
     )(
-      scanner => ZIO.succeed(scanner.close())
+      scanner =>
+        ZIO.succeed("Closing Scanner...").debugThread *>
+          ZIO.succeed(scanner.close()) *>
+            ZIO.succeed("Scanner closed").debugThread
     )(
       scanFile
     )
