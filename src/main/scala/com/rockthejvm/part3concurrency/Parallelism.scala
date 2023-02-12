@@ -45,6 +45,7 @@ object Parallelism extends ZIOAppDefault {
   }
 
   // parallel combinators
+
   // zipPar, zipWithPar
 
   // collectAllPar
@@ -61,5 +62,33 @@ object Parallelism extends ZIOAppDefault {
   val sumPar: UIO[Int] = ZIO.reduceAllPar(ZIO.succeed(0), effects)(_ + _) // reduce on effects
   val sumParMerge: UIO[Int] = ZIO.mergeAllPar(effects)(0)(_ + _) // more general version of reduceAllPar
 
-  override def run: ZIO[Any, Any, Any] = collectedValues.debugThread
+  /*
+    if all the effects succeed, we are good
+    if one effect fails, all others are interrupted, and the first failed effect's error is surfaced
+    if one effect is interrupted, all others are also interrupted, and the error = interruption itself
+    if the entire parent Fiber is interrupted, all effects are interrupted
+  */
+
+  // TODO: Count the words in all files using a parallel combinator (1+ from above)
+  def countWords(filePath: String): UIO[Int] =
+    ZIO.succeed {
+      val source = scala.io.Source.fromFile(filePath)
+      val nWords = source.getLines.mkString(" ").split(" ").count(_.nonEmpty)
+      source.close
+      nWords
+    }
+
+  def countWordsParallel(nFiles: Int): UIO[Int] =
+    ZIO.reduceAllPar(
+      ZIO.succeed(0),
+      (1 to nFiles)
+        .map(i =>
+          countWords(
+            s"src/main/resources/testfile_$i.txt"
+          )
+        )
+    )(_ + _)
+
+
+  override def run: ZIO[Any, Any, Any] = countWordsParallel(10).debugThread
 }
