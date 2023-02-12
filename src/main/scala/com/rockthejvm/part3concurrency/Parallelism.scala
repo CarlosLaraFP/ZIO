@@ -1,6 +1,7 @@
 package com.rockthejvm.part3concurrency
 
 import zio._
+import com.rockthejvm.utils._
 
 object Parallelism extends ZIOAppDefault {
 
@@ -44,7 +45,21 @@ object Parallelism extends ZIOAppDefault {
   }
 
   // parallel combinators
+  // zipPar, zipWithPar
 
+  // collectAllPar
+  val effects: Seq[UIO[Int]] = (1 to 10).map(i => ZIO.succeed(i).debugThread)
+  val collectedValues: UIO[Seq[Int]] = ZIO.collectAllPar(effects)
+  // this general concept of unwrapping two wrapper types inside out is called "Traverse"
+  // collectAllPar has the property that the values contained in the Seq are in the same order
+  // as the effects were created in the original sequence, even though they are evaluated in different threads
 
-  override def run: ZIO[Any, Any, Any] = ???
+  // foreachPar
+  val printlnParallel: UIO[List[Unit]] = ZIO.foreachPar((1 to 10).toList)(i => ZIO.succeed(println(i)))
+
+  // reduceAllPar, mergeAllPar
+  val sumPar: UIO[Int] = ZIO.reduceAllPar(ZIO.succeed(0), effects)(_ + _) // reduce on effects
+  val sumParMerge: UIO[Int] = ZIO.mergeAllPar(effects)(0)(_ + _) // more general version of reduceAllPar
+
+  override def run: ZIO[Any, Any, Any] = collectedValues.debugThread
 }
