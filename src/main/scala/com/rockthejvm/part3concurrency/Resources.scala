@@ -2,6 +2,9 @@ package com.rockthejvm.part3concurrency
 
 import zio._
 
+import java.util.Scanner
+import java.io.File
+
 import com.rockthejvm.utils._
 
 object Resources extends ZIOAppDefault {
@@ -43,7 +46,69 @@ object Resources extends ZIOAppDefault {
       fib <- (conn.open *> ZIO.sleep(300.seconds)).ensuring(conn.close).fork
       _ <- ZIO.sleep(1.second) *> ZIO.succeed("Interrupting").debugThread *> fib.interrupt
       _ <- fib.join
+    } yield () // prevents leaking connections
+
+  // ensuring is low-level and error-prone at scale
+
+  /*
+    TODO: acquireRelease instead to specify how to acquire and release a resource
+      - acquiring cannot be interrupted
+      - all finalizers are guaranteed to run
+  */
+  val cleanConnection = ZIO.acquireRelease(Connection.create("rockthejvm.com"))(_.close)
+  val fetchWithResource = for {
+    conn <- cleanConnection
+    fib <- (conn.open *> ZIO.sleep(300.seconds)).fork
+    _ <- ZIO.sleep(1.second) *> ZIO.succeed("Interrupting").debugThread *> fib.interrupt
+    _ <- fib.join
+  } yield ()
+
+  // removes Scope dependency from effect
+  val fetchScoped: UIO[Unit] = ZIO.scoped(fetchWithResource)
+
+  // acquireReleaseWith (because it includes usage, Scope dependency is not required)
+  val cleanerConnection: UIO[Unit] =
+    ZIO.acquireReleaseWith(
+      Connection.create("rockthejvm.com") // acquisition
+    )(
+      _.close // release
+    )(
+      conn => conn.open *> ZIO.sleep(300.seconds) // usage
+    )
+
+  val fetchWithAnotherResource: UIO[Unit] =
+    for {
+      fib <- cleanerConnection.fork
+      _ <- ZIO.sleep(1.second) *> ZIO.succeed("Interrupting").debugThread *> fib.interrupt
+      _ <- fib.join
     } yield ()
 
-  override def run: ZIO[Any, Any, Any] = properFetchUrl
+  // TODO 1: Use acquireRelease to open a file and print all lines (one every 100 millis), then close file
+  def openFileScanner(path: String): UIO[Scanner] = // scanner.hasNext or .nextLine
+    ZIO.succeed(new Scanner(new File(path)))
+
+  def scanFile(scanner: Scanner): UIO[Unit] = {
+      println(scanner.nextLine())
+      ZIO.sleep(100.millis) *> scanFile(scanner)
+    }
+
+  def acquireOpenFile(path: String): UIO[Unit] =
+    ZIO.acquireReleaseWith(
+      openFileScanner(path)
+    )(
+      scanner => ZIO.succeed(scanner.close())
+    )(
+      scanFile
+    )
+
+  val testInterruptFileDisplay: UIO[Unit] =
+    for {
+      fib <- acquireOpenFile("src/main/scala/com/rockthejvm/part3concurrency/Resources.scala")
+        .debugThread
+        .fork
+      _ <- ZIO.sleep(2.seconds) *> fib.interrupt
+    } yield ()
+
+
+  override def run = testInterruptFileDisplay
 }
