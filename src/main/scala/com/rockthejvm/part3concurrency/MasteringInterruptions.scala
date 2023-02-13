@@ -36,7 +36,7 @@ object MasteringInterruptions extends ZIOAppDefault {
     _ <- fiber.join
   } yield ()
 
-  // ZIO.uninterruptible (atomic effect)
+  // TODO: ZIO.uninterruptible (atomic effect)
   val atomicPayment: Task[String] = ZIO.uninterruptible(fuzzyPaymentSystem)
   val sameAtomicPayment: Task[String] = fuzzyPaymentSystem.uninterruptible
 
@@ -116,9 +116,9 @@ object MasteringInterruptions extends ZIOAppDefault {
   val threeStepProgram: UIO[Unit] = {
     val sequence = ZIO.uninterruptibleMask { restore =>
       for {
-        _ <- restore(ZIO.succeed("Interruptible").debugThread *> ZIO.sleep(1.second)) // interruptible
-        _ <- ZIO.succeed("Uninterruptible").debugThread *> ZIO.sleep(1.second) // uninterruptible
-        _ <- restore(ZIO.succeed("Interruptible Two").debugThread *> ZIO.sleep(1.second)) // interruptible
+        _ <- restore(ZIO.succeed("Interruptible").debugThread *> ZIO.sleep(1.second)) // interruptible region
+        _ <- ZIO.succeed("Uninterruptible").debugThread *> ZIO.sleep(1.second) // uninterruptible region
+        _ <- restore(ZIO.succeed("Interruptible Two").debugThread *> ZIO.sleep(1.second)) // interruptible region
       } yield ()
     }
     for {
