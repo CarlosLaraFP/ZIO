@@ -87,10 +87,12 @@ object Resources extends ZIOAppDefault {
   def openFileScanner(path: String): UIO[Scanner] = // scanner.hasNext or .nextLine
     ZIO.succeed(new Scanner(new File(path)))
 
-  def scanFile(scanner: Scanner): UIO[Unit] = {
-      println(scanner.nextLine())
-      ZIO.sleep(100.millis) *> scanFile(scanner)
-    }
+  def scanFile(scanner: Scanner): UIO[Unit] =
+    if (scanner.hasNextLine) {
+      ZIO.succeed(scanner.nextLine()).debugThread *>
+        ZIO.sleep(100.millis) *>
+          scanFile(scanner)
+    } else ZIO.unit
 
   def acquireOpenFile(path: String): UIO[Unit] =
     ZIO.acquireReleaseWith(
@@ -106,12 +108,52 @@ object Resources extends ZIOAppDefault {
 
   val testInterruptFileDisplay: UIO[Unit] =
     for {
-      fib <- acquireOpenFile("src/main/scala/com/rockthejvm/part3concurrency/Resources.scala")
-        .debugThread
-        .fork
+      fib <- acquireOpenFile("src/main/scala/com/rockthejvm/part3concurrency/Resources.scala").fork
       _ <- ZIO.sleep(2.seconds) *> fib.interrupt
     } yield ()
 
+  // acquireRelease vs acquireReleaseWith (code ergonomics)
+  def connectionFromConfig(path: String): UIO[Unit] =
+    ZIO.acquireReleaseWith(
+      openFileScanner(path)
+    )(scanner =>
+      ZIO.succeed("Closing Scanner...").debugThread *>
+        ZIO.succeed(scanner.close()) *>
+          ZIO.succeed("Scanner closed").debugThread
+    )(scanner =>
+      ZIO.acquireReleaseWith(
+        Connection.create(scanner.nextLine)
+      )(
+        connection => connection.close
+      )(
+        connection => connection.open *> ZIO.never
+      )
+    )
 
-  override def run = testInterruptFileDisplay
+  def getScannerSafely(path: String): ZIO[Any with Scope, Nothing, Scanner] =
+    ZIO.acquireRelease(
+      openFileScanner(path)
+    )(scanner =>
+      ZIO.succeed("Closing Scanner...").debugThread *>
+        ZIO.succeed(scanner.close()) *>
+        ZIO.succeed("Scanner closed").debugThread
+    )
+
+  def getConnectionSafely(scanner: Scanner): ZIO[Any with Scope, Nothing, Connection] =
+    ZIO.acquireRelease(
+      Connection.create(scanner.nextLine)
+    )(
+      connection => connection.close
+    )
+
+  // acquireRelease is better for nested resources
+  def connFromConfig(path: String): ZIO[Any with Scope, Nothing, Unit] =
+    for {
+      scanner <- getScannerSafely(path)
+      connection <- getConnectionSafely(scanner)
+      _ <- connection.open *> ZIO.never
+    } yield ()
+
+
+  override def run = connFromConfig("src/main/scala/com/rockthejvm/part3concurrency/Resources.scala")
 }
