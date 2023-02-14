@@ -65,26 +65,34 @@ object AsyncEffects extends ZIOAppDefault {
   // TODO 1: lift a computation running on some external thread to a ZIO
   //  - hint: invoke the callback cb when the computation is complete
   //  - hint: don't wrap the computation into a ZIO
-  def externalToZIO[A](computation: () => A)(executor: ExecutorService): Task[A] = ???
+  def externalToZIO[A](computation: () => A)(executor: ExecutorService): Task[A] =
+    ZIO.async[Any, Throwable, A] { cb =>
+      executor.execute { () =>
+        try {
+          val result = computation()
+          cb(ZIO.succeed(result))
+        }
+        catch {
+          case e: Throwable => cb(ZIO.fail(e))
+        }
+      }
+    }
 
-  val demoFirst: Task[Unit] = {
-    val executor = Executors.newFixedThreadPool(8)
-    val zio: Task[Int] = externalToZIO { () =>
-      println(s"[${Thread.currentThread().getName}] computing on some thread...")
+  val demoFirst: Task[Unit] =
+    externalToZIO { () =>
+      println(s"[${Thread.currentThread().getName}] computing on native JVM Thread...")
       Thread.sleep(1000)
       42
-    } {
-      executor
-    }
-    zio.debugThread.unit
-  }
+    }{ Executors.newFixedThreadPool(8) }
+      .debugThread
+      .unit
 
   // TODO 2: lift a Future to a ZIO
   //   - hint: invoke callback cb when the Future completes
   def futureToZIO[A](future: => Future[A])(implicit ec: ExecutionContext): Task[A] = ???
     // passing Future by-name because we don't want it executing when we pass it as an argument
 
-  val demoSecond: Task[Unit] = {
+  lazy val demoSecond: Task[Unit] = {
     implicit val ec: ExecutionContextExecutorService =
       ExecutionContext.fromExecutorService(
         Executors.newFixedThreadPool(8)
@@ -102,6 +110,7 @@ object AsyncEffects extends ZIOAppDefault {
   // TODO 3: implement a forever ZIO
   //   - ZIO.async Fiber is semantically blocked until you invoke the callback cb
   def foreverZIO[A]: UIO[A] = ???
+
 
   override def run: ZIO[Any, Any, Any] = demoFirst
 }
