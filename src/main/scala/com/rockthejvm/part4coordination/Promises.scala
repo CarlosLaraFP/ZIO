@@ -82,7 +82,34 @@ object Promises extends ZIOAppDefault {
     } yield ()
   }
 
+  def downloadFileRefAndPromise: Task[Unit] = {
+    def downloadFile(contentRef: Ref[String], promise: Promise[Throwable, String]): Task[Unit] =
+      ZIO.collectAllDiscard(
+        fileParts.map { part =>
+          for {
+            _ <- ZIO.succeed(s"got '$part'").debugThread
+            _ <- ZIO.sleep(1.second)
+            file <- contentRef.updateAndGet(_ + part)
+            _ <- if (file.endsWith("<EOF>")) promise.succeed(file) else ZIO.unit
+          } yield ()
+        }
+      )
 
-  override def run = downloadFileWithRef
+    def notifyFileComplete(contentRef: Ref[String], promise: Promise[Throwable, String]): Task[Unit] =
+      for {
+        _ <- ZIO.succeed("Downloading...").debugThread
+        file <- promise.await
+        _ <- ZIO.succeed(s"File download complete: $file").debugThread
+      } yield ()
+
+    for {
+      contentRef <- Ref.make("")
+      promise <- Promise.make[Throwable, String]
+      _ <- downloadFile(contentRef, promise) zipPar notifyFileComplete(contentRef, promise)
+    } yield ()
+  }
+
+
+  override def run = downloadFileRefAndPromise
 
 }
