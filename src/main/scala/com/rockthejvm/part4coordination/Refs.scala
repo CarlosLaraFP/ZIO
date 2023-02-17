@@ -8,7 +8,7 @@ import com.rockthejvm.utils._
 object Refs extends ZIOAppDefault {
 
   /*
-    TODO: Ref is a functionally pure atomic reference
+    TODO: Ref is a functionally pure atomic reference (thread-safe state management)
       - thread-safe variable which protects, read, and writes from concurrent modifications
         from multiple threads
       - atomic means that once the operation starts, all other threads that try to interact
