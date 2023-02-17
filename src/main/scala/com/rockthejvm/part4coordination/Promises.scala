@@ -15,6 +15,18 @@ object Promises extends ZIOAppDefault {
     promise.await
   }
 
+  // succeed, fail, complete
+  val writer: UIO[Boolean] = promise.flatMap { promise =>
+    Thread.sleep(5.seconds)
+    promise.succeed(42) // unblocks reader fiber
+  }
 
-  override def run: ZIO[Any, Any, Any] = ???
+
+  override def run =
+    for {
+      promise <- Promise.make[Throwable, Int]
+      blockedFiber <- promise.await.fork
+      _ <- ZIO.sleep(5.seconds) *> promise.succeed(42).unit.fork
+      _ <- blockedFiber.join.debugThread
+    } yield ()
 }
