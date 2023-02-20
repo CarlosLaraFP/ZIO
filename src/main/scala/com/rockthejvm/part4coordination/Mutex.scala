@@ -11,14 +11,14 @@ import scala.collection.immutable.Queue
 abstract class Mutex {
   // if a fiber calls acquire, this mutex will be locked for any fibers that subsequently call acquire
   // (semantically blocked until the lock is released by the initial fiber)
-  def acquire: Task[Unit]
+  def acquire: UIO[Unit]
   def release: UIO[Unit]
 }
 object Mutex {
 
   type Signal = Promise[Nothing, Unit]
   private case class State(locked: Boolean, waiting: Queue[Signal])
-
+  // initial state for the Ref (as always needed)
   private val unlocked = State(locked = false, Queue.empty[Signal])
 
   def make: UIO[Mutex] = Ref.make(unlocked).map { (state: Ref[State]) =>
@@ -31,8 +31,14 @@ object Mutex {
           - note: if acquire is called from a fiber while the mutex is locked, then that fiber
                   is semantically blocked until some other fiber calls release
       */
-      override def acquire: Task[Unit] = ???
-
+      override def acquire: UIO[Unit] =
+        Promise.make[Nothing, Unit].flatMap { signal =>
+          // modify partial function allows us to perform 2 things simultaneously: update a Ref and return something else per case
+          state.modify {
+            case State(false, queue) => ZIO.unit -> State(true, queue) // arrow syntax for tupling
+            case State(true, queue) => signal.await -> State(true, queue.enqueue(signal))
+          }.flatten
+        }
       /*
         TODO: Change the State of the Ref
           - if the mutex is unlocked, leave the State unchanged
@@ -40,7 +46,14 @@ object Mutex {
             - if the queue is empty, unlock the mutex
             - if the queue is nonempty, take the signal out of the queue and complete it
       */
-      override def release: UIO[Unit] = ???
+      override def release: UIO[Unit] =
+        state.modify {
+          case State(false, queue) => ZIO.unit -> State(false, queue)
+          case State(true, queue) if queue.isEmpty => ZIO.unit -> State(false, queue)
+          case State(true, queue) if queue.nonEmpty =>
+            val (signal, newQueue) = queue.dequeue
+            signal.succeed(()).unit -> State(true, newQueue)
+        }.flatten
     }
   }
 }
@@ -59,7 +72,7 @@ object MutexPlayground extends ZIOAppDefault {
       } yield ()
     })
 
-  def createTask(id: Int, mutex: Mutex): Task[Int] =
+  def createTask(id: Int, mutex: Mutex): UIO[Int] =
     for {
       _ <- ZIO.succeed(s"[Fiber $id] attempting to acquire lock...").debugThread
       _ <- mutex.acquire // promise.await
@@ -72,7 +85,7 @@ object MutexPlayground extends ZIOAppDefault {
       _ <- ZIO.succeed(s"[Fiber $id] released lock").debugThread
     } yield result
 
-  def demoLockingTasks: Task[Unit] =
+  def demoLockingTasks: UIO[Unit] =
     for {
       mutex <- Mutex.make
       _ <- ZIO.collectAllParDiscard(
