@@ -61,27 +61,26 @@ object Semaphores extends ZIOAppDefault {
     } yield ()
 
   /*
-    TODO: Exercise
+    Exercise
       - what is the code supposed to do?
       - find if there is anything wrong
       - fix the problem
   */
-  val mySemaphore: UIO[Semaphore] = Semaphore.make(1) // Mutex
+  val tasks: UIO[IndexedSeq[Int]] =
+    Semaphore.make(1).flatMap { semaphore =>
+      ZIO.collectAllPar((1 to 10).map { id =>
+        for {
+          _ <- ZIO.succeed(s"[Task $id] waiting to log in...").debugThread
+          result <- semaphore.withPermit {
+            for {
+              _ <- ZIO.succeed(s"[Task $id] logged in, working...").debugThread
+              result <- doWorkWhileLoggedIn
+              _ <- ZIO.succeed(s"[Task $id] done: $result").debugThread
+            } yield result
+          }
+        } yield result
+      })
+    }
 
-  val tasks: UIO[List[Int]] = Semaphore.make(1).flatMap { semaphore =>
-    ZIO.collectAllPar((1 to 10).toList.map { id =>
-      for {
-        _ <- ZIO.succeed(s"[Task $id] waiting to log in...").debugThread
-        result <- semaphore.withPermit {
-          for {
-            _ <- ZIO.succeed(s"[Task $id] logged in, working...").debugThread
-            result <- doWorkWhileLoggedIn
-            _ <- ZIO.succeed(s"[Task $id] done: $result").debugThread
-          } yield result
-        }
-      } yield result
-    })
-  }
-
-  override def run = tasks
+  override def run = tasks.debugThread
 }
