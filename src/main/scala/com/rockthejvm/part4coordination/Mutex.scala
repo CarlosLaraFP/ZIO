@@ -19,7 +19,7 @@ object Mutex {
   type Signal = Promise[Nothing, Unit]
   private case class State(locked: Boolean, waiting: Queue[Signal])
   // initial state for the Ref (as always needed)
-  private val unlocked = State(locked = false, Queue.empty[Signal])
+  private val unlocked = State(false, Queue.empty[Signal])
 
   def make: UIO[Mutex] = Ref.make(unlocked).map { (state: Ref[State]) =>
     new Mutex {
@@ -34,8 +34,8 @@ object Mutex {
       override def acquire: UIO[Unit] =
         Promise.make[Nothing, Unit].flatMap { signal =>
           // modify partial function allows us to perform 2 things simultaneously: update a Ref and return something else per case
-          state.modify {
-            case State(false, queue) => ZIO.unit -> State(true, queue) // arrow syntax for tupling
+          state.modify { // arrow syntax for tupling
+            case State(false, queue) => ZIO.unit -> State(true, queue) // JVM garbage collects signal
             case State(true, queue) => signal.await -> State(true, queue.enqueue(signal))
           }.flatten
         }
@@ -48,11 +48,13 @@ object Mutex {
       */
       override def release: UIO[Unit] =
         state.modify {
-          case State(false, queue) => ZIO.unit -> State(false, queue)
-          case State(true, queue) if queue.isEmpty => ZIO.unit -> State(false, queue)
-          case State(true, queue) if queue.nonEmpty =>
-            val (signal, newQueue) = queue.dequeue
-            signal.succeed(()).unit -> State(true, newQueue)
+          case State(false, _) => ZIO.unit -> unlocked
+          case State(true, queue) =>
+            if (queue.isEmpty) ZIO.unit -> unlocked
+            else {
+              val (signal, newQueue) = queue.dequeue
+              signal.succeed(()).unit -> State(true, newQueue)
+            }
         }.flatten
     }
   }
@@ -61,7 +63,7 @@ object Mutex {
 object MutexPlayground extends ZIOAppDefault {
 
   def workInCriticalRegion: UIO[Int] =
-    ZIO.sleep(3.seconds) *> Random.nextIntBounded(100)
+    ZIO.sleep(2.seconds) *> Random.nextIntBounded(100)
 
   def demoNonLockingTasks: UIO[Unit] =
     ZIO.collectAllParDiscard((1 to 10).toList.map { i =>
