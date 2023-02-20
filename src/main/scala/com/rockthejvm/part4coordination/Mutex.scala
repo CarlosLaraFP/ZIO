@@ -2,6 +2,7 @@ package com.rockthejvm.part4coordination
 
 import zio._
 import com.rockthejvm.utils._
+import scala.collection.immutable.Queue
 
 // TODO:
 //  Mutex is a concurrency primitive that allows locking an area
@@ -10,28 +11,36 @@ import com.rockthejvm.utils._
 abstract class Mutex {
   // if a fiber calls acquire, this mutex will be locked for any fibers that subsequently call acquire
   // (semantically blocked until the lock is released by the initial fiber)
-  def acquire: UIO[Unit]
+  def acquire: Task[Unit]
   def release: UIO[Unit]
 }
 object Mutex {
-  def make: UIO[Mutex] = ZIO.succeed {
+
+  type Signal = Promise[Nothing, Unit]
+  private case class State(locked: Boolean, waiting: Queue[Signal])
+
+  private val unlocked = State(locked = false, Queue.empty[Signal])
+
+  def make: UIO[Mutex] = Ref.make(unlocked).map { (state: Ref[State]) =>
     new Mutex {
-      private val ref = Ref.make[Boolean]
-      private val promise = Promise.make[Throwable, Boolean]
+      /*
+        TODO: Change the State of the Ref
+          - if the Mutex is unlocked, lock it
+          - if the Mutex is locked, create a Promise and add it to the Queue
+            => State(true, queue + new signal) and wait on that signal
+          - note: if acquire is called from a fiber while the mutex is locked, then that fiber
+                  is semantically blocked until some other fiber calls release
+      */
+      override def acquire: Task[Unit] = ???
 
-      // we need a semantic block if another fiber is in progress
-      override def acquire: UIO[Unit] =
-        for {
-          p <- promise
-          _ <- p.await
-        } yield ()
-
-      // Ref back to false
-      override def release: UIO[Unit] =
-        for {
-          p <- promise
-          _ <- p.succeed(true)
-        } yield ()
+      /*
+        TODO: Change the State of the Ref
+          - if the mutex is unlocked, leave the State unchanged
+          - if the mutex is locked
+            - if the queue is empty, unlock the mutex
+            - if the queue is nonempty, take the signal out of the queue and complete it
+      */
+      override def release: UIO[Unit] = ???
     }
   }
 }
@@ -39,7 +48,7 @@ object Mutex {
 object MutexPlayground extends ZIOAppDefault {
 
   def workInCriticalRegion: UIO[Int] =
-    ZIO.sleep(1.second) *> Random.nextIntBounded(100)
+    ZIO.sleep(3.seconds) *> Random.nextIntBounded(100)
 
   def demoNonLockingTasks: UIO[Unit] =
     ZIO.collectAllParDiscard((1 to 10).toList.map { i =>
@@ -50,7 +59,7 @@ object MutexPlayground extends ZIOAppDefault {
       } yield ()
     })
 
-  def createTask(id: Int, mutex: Mutex): UIO[Int] =
+  def createTask(id: Int, mutex: Mutex): Task[Int] =
     for {
       _ <- ZIO.succeed(s"[Fiber $id] attempting to acquire lock...").debugThread
       _ <- mutex.acquire // promise.await
@@ -63,7 +72,7 @@ object MutexPlayground extends ZIOAppDefault {
       _ <- ZIO.succeed(s"[Fiber $id] released lock").debugThread
     } yield result
 
-  def demoLockingTasks: UIO[Unit] =
+  def demoLockingTasks: Task[Unit] =
     for {
       mutex <- Mutex.make
       _ <- ZIO.collectAllParDiscard(
